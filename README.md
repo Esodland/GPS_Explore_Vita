@@ -1,5 +1,8 @@
 # Go!Explore 2.0 (PS Vita Homebrew)
 
+> ⚠️ **Statut du projet : Développement Actif** ⚠️
+> *Ce projet est toujours en cours de développement actif. Les travaux de recherche et d'ingénierie se poursuivent pour contourner les limitations matérielles et logicielles.*
+
 Ce dépôt contient le code source de l'application homebrew **GPS_Explore** (Go!Explore 2.0) pour PlayStation Vita, développée comme un démonstrateur technique pour accéder au module `SceLocation` de la console.
 
 ## État de la Recherche (Août 2026)
