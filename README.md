@@ -28,13 +28,22 @@ Pour maximiser les chances d'accès, l'application utilise :
 
 Rien de cela ne suffit à contourner le blocage du Kernel pour les exécutables FSELF. De plus, même l'application officielle Photos tourne dans le vide sans obtenir de *fix* GPS, ce qui laisse supposer que la couche logicielle GPS (A-GPS) est compromise si les éphémérides Sony ne sont plus joignables.
 
-## Prochaine Étape : Plugin Kernel (TaiHEN)
+## Victoire : Le Plugin Spoofer (TaiHEN)
 
-Pour faire fonctionner le GPS sur les Homebrews, un **Plugin Kernel TaiHEN** est nécessaire. 
+Pour prouver que l'application `GPS_Explore` était parfaitement codée et capable de traiter les données, nous avons développé un **Plugin TaiHEN en mode utilisateur (`gps_spoofer.suprx`)**.
 
-**Stratégie du Plugin :**
-1.  **Hooks (Détournement) :** Accrocher les fonctions internes de `SceLocation` dans le noyau pour contourner la vérification de sécurité (probablement un appel à `sceKernelGetProcessInfo` ou `sceAppMgrGetInfo` qui vérifie le flag FSELF/Auth ID).
-2.  **Mocking (Simulation) :** Si la puce physique refuse réellement de s'allumer, le plugin pourrait créer un faux périphérique GPS et injecter des coordonnées personnalisées dans `sceLocationGetLocation` pour tricher (Location Spoofer).
-3.  **A-GPS Wi-Fi :** Une autre approche du plugin consisterait à accrocher `sceLocationGetLocation`, faire une requête Wi-Fi/IP en arrière-plan via une API moderne (ex: Google Geolocation API), et renvoyer les coordonnées à l'application.
+Ce plugin intercepte les appels réseau et matériels du module `SceLocation` :
+1.  **`sceLocationOpen`** : Hooké pour renvoyer un faux jeton d'accès (`0x1337`) et contourner l'erreur `0x80101244`.
+2.  **`sceLocationGetLocation`** : Hooké pour injecter des coordonnées GPS falsifiées (celles de la Tour Eiffel à 18 km/h).
+
+**Résultat :** L'application a instantanément traité les données falsifiées, validant complètement l'architecture logicielle de notre Homebrew. Le code source du plugin se trouve dans le dossier `plugin/` de ce dépôt.
+
+## Phase 2 : Rétro-ingénierie du Kernel (En cours)
+
+L'objectif ultime reste d'activer la *vraie* puce GPS matérielle (si elle est encore fonctionnelle malgré l'absence de réseau Data).
+Pour faire tomber le blocage matériel du noyau :
+1.  **Décryptage** : Utilisation de `FAGDec` sur la console pour décrypter le module système `vs0:sys/external/liblocation.suprx` en un fichier `.elf` analysable.
+2.  **Analyse (Ghidra/IDA)** : Trouver l'instruction assembleur ARM précise qui rejette l'autorisation (probablement via un check de flag FSELF).
+3.  **Patch RAM** : Développer un plugin Kernel `.skprx` pour patcher dynamiquement l'instruction et forcer l'OS à allumer la puce GPS pour les Homebrews.
 
 Ce dépôt sert de base de départ. L'interface graphique avec `vita2d` est pleinement fonctionnelle et servira de réceptacle aux données GPS lorsque le plugin Kernel sera prêt !
