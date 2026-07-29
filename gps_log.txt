@@ -1,0 +1,2 @@
+--- DEMARRAGE GO!EXPLORE ---
+sceLocationOpen: 0x8010124F
