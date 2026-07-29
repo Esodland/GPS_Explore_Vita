@@ -1,15 +1,15 @@
 # Go!Explore 2.0 (PS Vita Homebrew)
 
-> 🟢 **Statut du projet : Succès / Preuve de concept validée** 🟢
-> *Le projet a abouti. Les limitations matérielles et logicielles ont été identifiées et contournées avec succès.*
+> ⚠️ **Statut du projet : Développement Actif** ⚠️
+> *Ce projet est toujours en cours de développement. L'interface et la logique de l'application fonctionnent (Preuve de concept de spoofing validée), mais l'accès aux véritables données de la puce GPS matérielle reste à accomplir.*
 
 Ce dépôt contient le code source de l'application homebrew **GPS_Explore** (Go!Explore 2.0) pour PlayStation Vita, développée comme un démonstrateur technique pour accéder au module `SceLocation` de la console.
 
 ## État de la Recherche (Août 2026)
 
-Après s'être heurtée à des blocages au niveau du noyau de la console, la recherche a finalement abouti. L'API `sceLocationOpen` refusait initialement de s'ouvrir pour les applications Homebrew (Fake-Signed SELF).
+Malgré une implémentation logicielle complète, l'application se heurte à des blocages au niveau du noyau de la console. L'API `sceLocationOpen` refuse de s'ouvrir pour les applications Homebrew (Fake-Signed SELF).
 
-Voici les codes d'erreur qui documentaient nos recherches initiales :
+Voici les codes d'erreur documentés de nos recherches :
 
 *   **`0x8010124F`** : Retourné systématiquement par `sceLocationOpen` pour les méthodes Wi-Fi (`SCE_LOCATION_LMETHOD_WIFI`) et mixtes (AGPS/3G).
     *   *Cause :* Service distant injoignable ou bloqué.
@@ -36,14 +36,14 @@ Ce plugin intercepte les appels réseau et matériels du module `SceLocation` :
 
 **Résultat :** L'application a instantanément traité les données falsifiées, validant complètement l'architecture logicielle de notre Homebrew. Le code source du plugin se trouve dans le dossier `plugin/` de ce dépôt.
 
-## Phase 2 : Rétro-ingénierie et Déblocage Matériel (Victoire !)
+## Phase 2 : Rétro-ingénierie et Déblocage Matériel (En cours)
 
-L'objectif ultime d'activer la *vraie* puce GPS matérielle a été atteint ! En décryptant (`FAGDec`) et décompilant (`vitadecompiler-mod`) le module `liblocation.suprx`, la cause exacte du blocage (`0x80101244`) a été identifiée :
+L'objectif ultime reste d'activer la *vraie* puce GPS matérielle. En décryptant (`FAGDec`) et décompilant (`vitadecompiler-mod`) le module `liblocation.suprx`, nous avons pu identifier la cause exacte du blocage (`0x80101244`) :
 
 1. **Vérification de Privilège** : Dans l'API `sceLocationOpen` (NID `0xDD271661`), le système vérifie une variable globale de privilège située dans le segment de données (Segment 1) à l'offset `0x30`.
-2. **Le Blocage Homebrew** : Pour les Homebrews (Fake-Signed), le gestionnaire d'applications initialise cette variable à `0`, ce qui bloque tout accès matériel. Le système exige une valeur de `2`.
-3. **Le Patch RAM (TaiHEN)** : Le plugin a été adapté pour injecter la valeur `2` (`taiInjectData(modid, 1, 0x30, &val, 4)`) directement dans la mémoire de `liblocation` juste avant d'appeler l'API officielle. 
+2. **Le Blocage Homebrew** : Pour les Homebrews (Fake-Signed), l'OS initialise cette variable à `0`, ce qui bloque tout accès matériel. Le système exige une valeur de `2`.
+3. **Piste de Solution (Le Patch RAM)** : Il devrait être possible de développer un patch pour injecter la valeur `2` (`taiInjectData(modid, 1, 0x30, &val, 4)`) directement dans la mémoire de `liblocation` juste avant d'appeler l'API officielle. 
 
-Grâce à ce patch mémoire, les sécurités internes de `SceLocation` considèrent l'application comme ayant les privilèges maximums, débloquant l'utilisation de la puce 3G/GPS et la récupération des vraies données.
+Tant que ce patch mémoire n'est pas développé et validé avec succès sur du vrai matériel (sans spoofing), le projet n'est pas considéré comme terminé. 
 
-Ce dépôt sert maintenant de preuve de concept complète. L'interface graphique avec `vita2d` est pleinement fonctionnelle et reçoit désormais les véritables données GPS de la console !
+Ce dépôt sert de base de départ. L'interface graphique avec `vita2d` est pleinement fonctionnelle (comme prouvé par notre spoofer) et servira de réceptacle aux vraies données GPS lorsque le patch de déblocage matériel sera opérationnel !
