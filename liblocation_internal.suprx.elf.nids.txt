@@ -1,0 +1,55 @@
+//EXPORTS: 
+//0: module_start 0x935cd196 @OFF: 0xe7d VADDR: 0x81000e7d
+//1: module_stop 0x79f8e492 @OFF: 0x181 VADDR: 0x81000181
+//2: module_stop 0x1a9822a4 @OFF: 0x1a84 VADDR: 0x81001a84
+//3: module_stop 0xd20886eb @OFF: 0x1a98 VADDR: 0x81001a98
+//4: module_stop 0x936c8a78 @OFF: 0x1aac VADDR: 0x81001aac
+//5: module_info 0x6c2224ba @OFF: 0x13ec VADDR: 0x810013ec
+
+//SceLibLocationInternal:0x98b0c75
+//6: SceLibLocationInternal_209228A3 0x209228a3 @OFF: 0x12b VADDR: 0x8100012b
+//7: SceLibLocationInternal_29267421 0x29267421 @OFF: 0xa7 VADDR: 0x810000a7
+//8: SceLibLocationInternal_3500A98C 0x3500a98c @OFF: 0x1 VADDR: 0x81000001
+//9: SceLibLocationInternal_A8531ABF 0xa8531abf @OFF: 0x43 VADDR: 0x81000043
+//10: SceLibLocationInternal_EEF11F68 0xeef11f68 @OFF: 0x113 VADDR: 0x81000113
+//IMPORTS: 
+
+//SceLibKernel:0xcae9ace6
+//0: SceLibKernel_244E76D2 0x244e76d2 @OFF: 0x122c VADDR: 0x8100122c
+//1: SceLibKernel_2E3B02A1 0x2e3b02a1 @OFF: 0x123c VADDR: 0x8100123c
+//2: SceLibKernel_37691BF8 0x37691bf8 @OFF: 0x124c VADDR: 0x8100124c
+//3: SceLibKernel_3B9E301A 0x3b9e301a @OFF: 0x137c VADDR: 0x8100137c
+//4: SceLibKernel_46E7BE7B 0x46e7be7b @OFF: 0x125c VADDR: 0x8100125c
+//5: SceLibKernel_632980D7 0x632980d7 @OFF: 0x126c VADDR: 0x8100126c
+//6: SceLibKernel_86EF7680 0x86ef7680 @OFF: 0x138c VADDR: 0x8100138c
+//7: SceLibKernel_91FA6614 0x91fa6614 @OFF: 0x127c VADDR: 0x8100127c
+//8: SceLibKernel_9C56B4D1 0x9c56b4d1 @OFF: 0x139c VADDR: 0x8100139c
+//9: SceLibKernel_9F793F84 0x9f793f84 @OFF: 0x128c VADDR: 0x8100128c
+//10: SceLibKernel_AE1A21EC 0xae1a21ec @OFF: 0x13ac VADDR: 0x810013ac
+//11: SceLibKernel_C458D60A 0xc458d60a @OFF: 0x129c VADDR: 0x8100129c
+//12: SceLibKernel_C5C11EE7 0xc5c11ee7 @OFF: 0x12ac VADDR: 0x810012ac
+//13: SceLibKernel_DA6EC8EF 0xda6ec8ef @OFF: 0x12bc VADDR: 0x810012bc
+//14: SceLibKernel_DDB395A9 0xddb395a9 @OFF: 0x12cc VADDR: 0x810012cc
+
+//SceThreadmgr:0x859a24b1
+//15: SceThreadmgr_1BBDE3D9 0x1bbde3d9 @OFF: 0x12dc VADDR: 0x810012dc
+
+//SceThreadmgrCoredumpTime:0x5e8d0e22
+//16: SceThreadmgrCoredumpTime_0C8A38E1 0xc8a38e1 @OFF: 0x12ec VADDR: 0x810012ec
+
+//SceIpmi:0xf4e34edb
+//17: SceIpmi_4E255C31 0x4e255c31 @OFF: 0x12fc VADDR: 0x810012fc
+//18: SceIpmi_B282B430 0xb282b430 @OFF: 0x130c VADDR: 0x8100130c
+
+//SceLibLocation:0x924d86d7
+//19: SceLibLocation_0C0BB66A 0xc0bb66a @OFF: 0x131c VADDR: 0x8100131c
+//20: SceLibLocation_2311B24A 0x2311b24a @OFF: 0x132c VADDR: 0x8100132c
+//21: SceLibLocation_7F74AA94 0x7f74aa94 @OFF: 0x133c VADDR: 0x8100133c
+//22: SceLibLocation_822BBF06 0x822bbf06 @OFF: 0x134c VADDR: 0x8100134c
+//23: SceLibLocation_991AF2D0 0x991af2d0 @OFF: 0x135c VADDR: 0x8100135c
+//24: SceLibLocation_EFC9BD25 0xefc9bd25 @OFF: 0x136c VADDR: 0x8100136c
+
+//SceSysmem:0x37fe725a
+//25: SceSysmem_A91E15EE 0xa91e15ee @OFF: 0x13bc VADDR: 0x810013bc
+//26: SceSysmem_B8EF5818 0xb8ef5818 @OFF: 0x13cc VADDR: 0x810013cc
+//27: SceSysmem_B9D5EBDE 0xb9d5ebde @OFF: 0x13dc VADDR: 0x810013dc

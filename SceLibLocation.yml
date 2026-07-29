@@ -1,0 +1,43 @@
+version: 0x2
+firmware: 3.60
+modules:
+  SceLibLocation:
+    nid: 0x6015DE69
+    libraries:
+      SceLibLocation:
+        nid: 0x924D86D7
+        kernel: true
+        functions:
+          SceLibLocation_0341758B: 0x0341758B
+          SceLibLocation_07D4DFE0: 0x07D4DFE0
+          SceLibLocation_09C4F674: 0x09C4F674
+          SceLibLocation_0C0BB66A: 0x0C0BB66A
+          SceLibLocation_12D1F0EA: 0x12D1F0EA
+          SceLibLocation_14FE76E8: 0x14FE76E8
+          SceLibLocation_15BC27C8: 0x15BC27C8
+          SceLibLocation_16F41ED0: 0x16F41ED0
+          SceLibLocation_188CE004: 0x188CE004
+          SceLibLocation_1E80199A: 0x1E80199A
+          SceLibLocation_2311B24A: 0x2311B24A
+          SceLibLocation_41C1E68F: 0x41C1E68F
+          SceLibLocation_482622C6: 0x482622C6
+          SceLibLocation_4C8B6F21: 0x4C8B6F21
+          SceLibLocation_4E9E5ED9: 0x4E9E5ED9
+          SceLibLocation_5C7185D2: 0x5C7185D2
+          SceLibLocation_71503251: 0x71503251
+          SceLibLocation_730FF842: 0x730FF842
+          SceLibLocation_7F74AA94: 0x7F74AA94
+          SceLibLocation_822BBF06: 0x822BBF06
+          SceLibLocation_8AAF3FBD: 0x8AAF3FBD
+          SceLibLocation_92E53F94: 0x92E53F94
+          SceLibLocation_991AF2D0: 0x991AF2D0
+          SceLibLocation_AA026B53: 0xAA026B53
+          SceLibLocation_B1F55065: 0xB1F55065
+          SceLibLocation_C1CFEC92: 0xC1CFEC92
+          SceLibLocation_C895E567: 0xC895E567
+          SceLibLocation_DD271661: 0xDD271661
+          SceLibLocation_DE0A9EA4: 0xDE0A9EA4
+          SceLibLocation_E3CBF875: 0xE3CBF875
+          SceLibLocation_ED378700: 0xED378700
+          SceLibLocation_EFC9BD25: 0xEFC9BD25
+          SceLibLocation_FF016C13: 0xFF016C13

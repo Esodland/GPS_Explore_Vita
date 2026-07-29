@@ -1,0 +1,11 @@
+version: 0x2
+firmware: 3.60
+modules:
+  SceLibLocationFactory:
+    nid: 0x86F807A8
+    libraries:
+      SceLibLocationFactory:
+        nid: 0x6F397272
+        kernel: true
+        functions:
+          SceLibLocationFactory_9E020010: 0x9E020010

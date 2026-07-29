@@ -6,39 +6,3 @@
 [DEBUG] sceNetCtlInit : 0x00000000
 [DEBUG] sceSysmoduleLoadModule(LOCATION) : 0x00000000
 [DEBUG] User pressed CROSS : 0x00000000
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x8010124F
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] sceLocationOpen(method, hmethod) : 0x80101244
-[DEBUG] No valid handle returned. Forcing Confirm(1)... : 0x00000000
-[DEBUG] sceLocationConfirm(1) : 0x80101241
-[DEBUG] All Location methods failed : 0x80101244

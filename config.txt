@@ -1,0 +1,47 @@
+# VBANIM
+*NPXS10015
+ur0:tai/vbanim.suprx
+
+# ITLS
+*KERNEL
+ur0:tai/itls.skprx
+
+# This file is used as an alternative if ux0:tai/config.txt is not found.
+# For users plugins, you must refresh taiHEN from HENkaku Settings for
+# changes to take place.
+# For kernel plugins, you must reboot for changes to take place.
+*KERNEL
+ur0:tai/storagemgr.skprx
+ur0:tai/nonpdrm.skprx
+ur0:tai/0syscall6.skprx
+ur0:tai/reAuth.skprx
+ur0:tai/vitacheat360.skprx
+ur0:tai/vitabright.skprx
+# henkaku.skprx is hard-coded to load and is not listed here
+*main
+# main is a special titleid for SceShell
+ur0:tai/henkaku.suprx
+ur0:tai/shellbat.suprx
+ur0:tai/custom_warning.suprx
+# vitacompanion : FTP 1337 + commandes 1338 (launch/destroy) — dev a distance
+ur0:tai/vitacompanion.suprx
+*NPXS10015
+# this is for modifying the version string
+ur0:tai/henkaku.suprx
+*NPXS10016
+# this is for modifying the version string in settings widget
+ur0:tai/henkaku.suprx
+*ALL
+ur0:tai/InfiniteNet.suprx
+
+# vita-bridge : plugin d'injection d'inputs / debug pilote par IA
+*VBRG00001
+ur0:tai/vitabridge.suprx
+
+# vita-bridge SceShell (menu / LiveArea)
+*main
+ur0:tai/vitabridge.suprx
+
+# GPS Spoofer
+*GPSX00001
+ur0:tai/gps_spoofer.suprx
