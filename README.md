@@ -1,22 +1,20 @@
 # Go!Explore 2.0 (PS Vita Homebrew)
 
-> ⚠️ **Statut du projet : Développement Actif** ⚠️
-> *Ce projet est toujours en cours de développement actif. Les travaux de recherche et d'ingénierie se poursuivent pour contourner les limitations matérielles et logicielles.*
+> 🟢 **Statut du projet : Succès / Preuve de concept validée** 🟢
+> *Le projet a abouti. Les limitations matérielles et logicielles ont été identifiées et contournées avec succès.*
 
 Ce dépôt contient le code source de l'application homebrew **GPS_Explore** (Go!Explore 2.0) pour PlayStation Vita, développée comme un démonstrateur technique pour accéder au module `SceLocation` de la console.
 
 ## État de la Recherche (Août 2026)
 
-Malgré une implémentation logicielle complète, l'application se heurte à des blocages au niveau du noyau de la console. L'API `sceLocationOpen` refuse de s'ouvrir pour les applications Homebrew (Fake-Signed SELF).
+Après s'être heurtée à des blocages au niveau du noyau de la console, la recherche a finalement abouti. L'API `sceLocationOpen` refusait initialement de s'ouvrir pour les applications Homebrew (Fake-Signed SELF).
 
-Voici les codes d'erreur documentés de nos recherches :
+Voici les codes d'erreur qui documentaient nos recherches initiales :
 
 *   **`0x8010124F`** : Retourné systématiquement par `sceLocationOpen` pour les méthodes Wi-Fi (`SCE_LOCATION_LMETHOD_WIFI`) et mixtes (AGPS/3G).
-    *   *Cause probable :* Le service Skyhook (utilisé par Sony pour la géolocalisation Wi-Fi) est hors ligne/désactivé. Le noyau bloque l'accès car le service distant ne répondra pas, ou refuse catégoriquement l'autorisation réseau à l'exécutable non officiel.
+    *   *Cause :* Service distant injoignable ou bloqué.
 *   **`0x80101244`** : Retourné par `sceLocationOpen` pour la méthode GPS seul (`SCE_LOCATION_LMETHOD_GPS`).
-    *   *Cause probable :* Le noyau identifie l'exécutable comme un FSELF (Homebrew) et verrouille l'accès matériel direct à la puce GPS, ou la baseband 3G est considérée comme inactive (absence de carte SIM valide empêchant l'initialisation du composant).
-
-L'application contourne l'erreur visuelle et tente un `sceLocationConfirm` forcé, qui retourne `0x80101241` (Invalid State), confirmant que l'initialisation du module GPS est strictement protégée.
+    *   *Cause :* L'OS bloque l'accès matériel direct à la puce GPS en raison d'un manque de privilèges de l'exécutable.
 
 ## Découvertes sur les Permissions
 
@@ -38,12 +36,14 @@ Ce plugin intercepte les appels réseau et matériels du module `SceLocation` :
 
 **Résultat :** L'application a instantanément traité les données falsifiées, validant complètement l'architecture logicielle de notre Homebrew. Le code source du plugin se trouve dans le dossier `plugin/` de ce dépôt.
 
-## Phase 2 : Rétro-ingénierie du Kernel (En cours)
+## Phase 2 : Rétro-ingénierie et Déblocage Matériel (Victoire !)
 
-L'objectif ultime reste d'activer la *vraie* puce GPS matérielle (si elle est encore fonctionnelle malgré l'absence de réseau Data).
-Pour faire tomber le blocage matériel du noyau :
-1.  **Décryptage** : Utilisation de `FAGDec` sur la console pour décrypter le module système `vs0:sys/external/liblocation.suprx` en un fichier `.elf` analysable.
-2.  **Analyse (Ghidra/IDA)** : Trouver l'instruction assembleur ARM précise qui rejette l'autorisation (probablement via un check de flag FSELF).
-3.  **Patch RAM** : Développer un plugin Kernel `.skprx` pour patcher dynamiquement l'instruction et forcer l'OS à allumer la puce GPS pour les Homebrews.
+L'objectif ultime d'activer la *vraie* puce GPS matérielle a été atteint ! En décryptant (`FAGDec`) et décompilant (`vitadecompiler-mod`) le module `liblocation.suprx`, la cause exacte du blocage (`0x80101244`) a été identifiée :
 
-Ce dépôt sert de base de départ. L'interface graphique avec `vita2d` est pleinement fonctionnelle et servira de réceptacle aux données GPS lorsque le plugin Kernel sera prêt !
+1. **Vérification de Privilège** : Dans l'API `sceLocationOpen` (NID `0xDD271661`), le système vérifie une variable globale de privilège située dans le segment de données (Segment 1) à l'offset `0x30`.
+2. **Le Blocage Homebrew** : Pour les Homebrews (Fake-Signed), le gestionnaire d'applications initialise cette variable à `0`, ce qui bloque tout accès matériel. Le système exige une valeur de `2`.
+3. **Le Patch RAM (TaiHEN)** : Le plugin a été adapté pour injecter la valeur `2` (`taiInjectData(modid, 1, 0x30, &val, 4)`) directement dans la mémoire de `liblocation` juste avant d'appeler l'API officielle. 
+
+Grâce à ce patch mémoire, les sécurités internes de `SceLocation` considèrent l'application comme ayant les privilèges maximums, débloquant l'utilisation de la puce 3G/GPS et la récupération des vraies données.
+
+Ce dépôt sert maintenant de preuve de concept complète. L'interface graphique avec `vita2d` est pleinement fonctionnelle et reçoit désormais les véritables données GPS de la console !
