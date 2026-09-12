@@ -2,3 +2,8 @@ build/
 *.vpk
 photos_*
 *.py
+
+# Intermédiaires de build des plugins
+plugin/*.o
+plugin/*.elf
+plugin/*.velf

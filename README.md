@@ -1,49 +1,82 @@
 # Go!Explore 2.0 (PS Vita Homebrew)
 
-> ⚠️ **Statut du projet : Développement Actif** ⚠️
-> *Ce projet est toujours en cours de développement. L'interface et la logique de l'application fonctionnent (Preuve de concept de spoofing validée), mais l'accès aux véritables données de la puce GPS matérielle reste à accomplir.*
+> ⚠️ **Statut : recherche active — chaîne d'autorisation ENTIÈREMENT débloquée, dernier obstacle = mémoire physique** ⚠️
+> Un homebrew fake-signed est passé de « `sceLocationOpen` bloqué net » à **pleinement autorisé, dialogue système de consentement accepté, `open`+`confirm` réussis**. Il reste une seule barrière technique (allocation de mémoire physique à l'ouverture d'une vraie méthode GPS), qui n'est **ni** un blocage privilège **ni** noyau.
 
-Ce dépôt contient le code source de l'application homebrew **GPS_Explore** (Go!Explore 2.0) pour PlayStation Vita, développée comme un démonstrateur technique pour accéder au module `SceLocation` de la console.
+Application homebrew **GPS_Explore** (Go!Explore 2.0) pour PlayStation Vita : démonstrateur d'accès au module `SceLocation`. Cible matérielle : **PCH-1100 (OLED 3G)** — le seul modèle Vita avec une puce GPS.
 
-## État de la Recherche (Août 2026)
+Reverse engineering détaillé et vérifié sur matériel : voir **`SceLocation_Reverse_Engineering.md`**.
 
-Malgré une implémentation logicielle complète, l'application se heurte à des blocages au niveau du noyau de la console. L'API `sceLocationOpen` refuse de s'ouvrir pour les applications Homebrew (Fake-Signed SELF).
+---
 
-Voici les codes d'erreur documentés de nos recherches :
+## Phase 1 — Architecture logicielle + spoofer (validé)
 
-*   **`0x8010124F`** : Retourné systématiquement par `sceLocationOpen` pour les méthodes Wi-Fi (`SCE_LOCATION_LMETHOD_WIFI`) et mixtes (AGPS/3G).
-    *   *Cause :* Service distant injoignable ou bloqué.
-*   **`0x80101244`** : Retourné par `sceLocationOpen` pour la méthode GPS seul (`SCE_LOCATION_LMETHOD_GPS`).
-    *   *Cause :* L'OS bloque l'accès matériel direct à la puce GPS en raison d'un manque de privilèges de l'exécutable.
+L'appli (`src/main.c`, interface `vita2d`) implémente le flux complet `open → confirm → getLocation`. Un **plugin TaiHEN spoofer** (`plugin/` → `gps_spoofer.suprx`) a prouvé que l'appli traite correctement les données en injectant de fausses coordonnées (Tour Eiffel) — validant toute l'architecture logicielle.
 
-## Découvertes sur les Permissions
+## Phase 2 — Reverse engineering vérifié sur matériel
 
-Pour maximiser les chances d'accès, l'application utilise :
-*   `ATTRIBUTE2=4112` et `ATTRIBUTE=1` dans le `param.sfo`.
-*   Auth ID usurpé : `0x2800000000000018` (Celui utilisé par l'application système officielle Photos `NPXS10004`, au lieu de l'habituel `0x2800000000000001`).
-*   Modification de la base `ur0:shell/db/app.db` (Table `tbl_appinfo`, champ de permission 3480795629 mis à 3 pour forcer l'autorisation système).
-*   Chargement de `SceNetCtlInit` avant l'accès pour forcer l'activation de la couche réseau.
+Analyse ligne à ligne des 4 modules décryptés (`liblocation`, `liblocation_internal`, `liblocation_factory`, `liblocation_extension`) **confirmée sur la console 3G** via des sondes TaiHEN.
 
-Rien de cela ne suffit à contourner le blocage du Kernel pour les exécutables FSELF. De plus, même l'application officielle Photos tourne dans le vide sans obtenir de *fix* GPS, ce qui laisse supposer que la couche logicielle GPS (A-GPS) est compromise si les éphémérides Sony ne sont plus joignables.
+Correction des premières notes (qui étaient erronées) :
+- Le vrai mur de l'appli est **`0x8010124F`** (pas `0x80101244`, qui n'est que « méthode invalide »).
+- Il vient de `sub_81001186` : `if (*(seg1+0x30) == 0) return 0x8010124F;`. Le **global de privilège** est en **segment 1 + 0x30** (VADDR `0x81004030`), `0` pour un homebrew.
+- Injecter `2` seul **ne suffit pas** : le code déréférence ensuite un **pointeur de contexte en seg1+0x00, `NULL`** chez un homebrew → crash.
+- Le contexte est créé par l'init `SceLibLocationInternal_3500A98C`, normalement invoqué côté serveur — **jamais dans un processus homebrew**.
 
-## Victoire : Le Plugin Spoofer (TaiHEN)
+Sonde matérielle (`plugin/probe.c`, PCH-1100) : `context=0`, `priv=0`, layout des segments identique au statique. ✔
 
-Pour prouver que l'application `GPS_Explore` était parfaitement codée et capable de traiter les données, nous avons développé un **Plugin TaiHEN en mode utilisateur (`gps_spoofer.suprx`)**.
+Le serveur de localisation est un **serveur IPMI nommé `"SceLocationLoc"`** (contacté par `liblocation.suprx` et `liblocation_factory.suprx`).
+- Piste factory testée : la **connexion IPMI est acceptée** pour un homebrew (`SceIpmi_4E255C31`→handle, transport OK), mais les méthodes debug renvoient `0x8010124B` (« non supporté » sur retail) = cul-de-sac.
+- **Fait clé : l'ACL de connexion n'est pas le mur.**
 
-Ce plugin intercepte les appels réseau et matériels du module `SceLocation` :
-1.  **`sceLocationOpen`** : Hooké pour renvoyer un faux jeton d'accès (`0x1337`) et contourner l'erreur `0x80101244`.
-2.  **`sceLocationGetLocation`** : Hooké pour injecter des coordonnées GPS falsifiées (celles de la Tour Eiffel à 18 km/h).
+## Phase 3 — Déblocage réel (chaîne franchie)
 
-**Résultat :** L'application a instantanément traité les données falsifiées, validant complètement l'architecture logicielle de notre Homebrew. Le code source du plugin se trouve dans le dossier `plugin/` de ce dépôt.
+Chaque palier vérifié sur la console 3G :
 
-## Phase 2 : Rétro-ingénierie et Déblocage Matériel (En cours)
+| Palier | Erreur | Solution appliquée |
+|---|---|---|
+| Gate client-side | `0x8010124F` | Écrire `seg1+0x30=2` + `seg1+0x34=1` puis appeler l'init `SceLibLocationInternal_3500A98C(1, 0x10000)` → **contexte/session créés** |
+| Autorisation appli | `0x80101249` | Ajouter la clé **`2840145610=1`** pour `GPSX00001` dans `ur0:shell/db/app.db` (`tbl_appinfo`) |
+| Consentement | — | Le **dialogue système** « Autoriser cette application à utiliser les données géographiques ? » s'affiche et est **accepté** ✅ |
+| `open(NONE)` + `confirm` | `0x0` / `0x0` | — |
 
-L'objectif ultime reste d'activer la *vraie* puce GPS matérielle. En décryptant (`FAGDec`) et décompilant (`vitadecompiler-mod`) le module `liblocation.suprx`, nous avons pu identifier la cause exacte du blocage (`0x80101244`) :
+### Détail des découvertes clés
+- **Séquence d'activation** (plugin `plugin/gps_activate.c`) : deux flags dans les données de `liblocation` gouvernent l'init — `seg1+0x30` (privilège, setter interne) et `seg1+0x34` (flag lu par l'export `SceLibLocation_2311B24A`, posé par `SceLibLocation_5C7185D2`). Écrits + init `3500A98C` → contexte créé (retour `0x0`).
+- **Autorisation par appli** : elle n'est **pas** dans le `param.sfo` (prouvé : `ecolibrium`, le vrai jeu GPS, est un jeu normal `ATTRIBUTE=2`). Elle est dans `app.db`, clé `2840145610` (Ecolibrium `PCSF00092`=1, Photos=3, near=`0x80000003`). L'ajout à `GPSX00001` élimine `0x80101249`.
+- **Résolution d'exports non documentés** : walk de la table d'exports via `taiGetModuleInfo` (voir `resolve_export`).
 
-1. **Vérification de Privilège** : Dans l'API `sceLocationOpen` (NID `0xDD271661`), le système vérifie une variable globale de privilège située dans le segment de données (Segment 1) à l'offset `0x30`.
-2. **Le Blocage Homebrew** : Pour les Homebrews (Fake-Signed), l'OS initialise cette variable à `0`, ce qui bloque tout accès matériel. Le système exige une valeur de `2`.
-3. **Piste de Solution (Le Patch RAM)** : Il devrait être possible de développer un patch pour injecter la valeur `2` (`taiInjectData(modid, 1, 0x30, &val, 4)`) directement dans la mémoire de `liblocation` juste avant d'appeler l'API officielle. 
+### Dernier obstacle : mémoire physique
+Ouvrir une **vraie** méthode GPS (1=AGPS+3G+WIFI, 2=GPS+WIFI, 5=GPS…) au lieu de 0=NONE :
 
-Tant que ce patch mémoire n'est pas développé et validé avec succès sur du vrai matériel (sans spoofing), le projet n'est pas considéré comme terminé. 
+```
+sceLocationOpen(method=5 GPS) -> 0x80024302 = SCE_KERNEL_ERROR_NO_FREE_PHYSICAL_PAGE
+```
 
-Ce dépôt sert de base de départ. L'interface graphique avec `vita2d` est pleinement fonctionnelle (comme prouvé par notre spoofer) et servira de réceptacle aux vraies données GPS lorsque le patch de déblocage matériel sera opérationnel !
+- Se produit **même après reboot propre** et **avant l'init de vita2d** → ni l'UI ni de l'accumulation.
+- Méthode 0 (NONE) réussit (n'alloue rien) ; les vraies méthodes doivent allouer de la **mémoire physique** (buffers IPMI / mapping du buffer partagé GPS) que le **budget du processus homebrew** n'a pas.
+- Cause de fond : en forçant l'init dans NOTRE processus (au lieu du serveur système), le stack client de localisation utilise le budget homebrew (limité). L'alloc qui échoue est interne à `SceIpmi`.
+
+C'est un problème d'**ingénierie mémoire**, pas d'autorisation/privilège/noyau.
+
+### Progression complète des erreurs
+`0x8010124F` (gate client) → *flags + init `3500A98C`* → `0x80101249` (appli non autorisée) → *`app.db` clé `2840145610`* → `0x80024302 / NO_FREE_PHYSICAL_PAGE` (budget mémoire physique).
+
+### Prochaines pistes (mémoire)
+1. Instrumenter la mémoire libre au moment de l'`open` (main / PHYCONT / CDRAM) pour identifier le pool épuisé.
+2. Augmenter le budget mémoire physique du processus (attributs `param.sfo`, notamment PHYCONT).
+3. Réduire les allocations du processus avant l'`open`.
+
+---
+
+## Contenu du dépôt
+
+- `src/main.c` — l'application (vita2d), ouvre en priorité une vraie méthode GPS (5/2/1/3/4).
+- `plugin/` — plugins TaiHEN de recherche : `probe.c` (sonde mémoire), `factory_test.c` (test ACL serveur), `init_test.c` / `unlock_test.c` (déblocage session), **`gps_activate.c`** (plugin d'activation propre : flags + init), et le `gps_spoofer` d'origine. `device_config.txt` = config taiHEN de la console.
+- `liblocation*.suprx.elf.*` — modules décryptés + décompilés.
+- `SceLocation_Reverse_Engineering.md` — analyse complète et historique daté des percées.
+
+## Déploiement / test à distance
+
+Console de dev accessible via **vitacompanion** (FTP `1337`, commandes `1338` : `launch`/`destroy`/`reboot`). Voir `deploy.ps1`. L'activation se charge via `ur0:tai/config.txt` (`*GPSX00001` → `ur0:tai/gps_activate.suprx`) ; l'autorisation appli via la clé `app.db` ci-dessus.
+
+> Note : le message d'erreur affiché par l'appli (« Vérifiez vos paramètres… ») est **codé en dur dans le homebrew** (`src/main.c`), ce n'est pas un message système.

@@ -103,19 +103,24 @@ int main(int argc, char *argv[]) {
                 int ret_open = -1;
                 SceLocationHandle best_handle = 0;
 
-                for (int i = 0; i <= 10; i++) {
-                    for (int j = 0; j <= 2; j++) {
-                        handle = 0;
-                        ret_open = sceLocationOpen(&handle, i, j);
-                        log_debug("sceLocationOpen(method, hmethod)", ret_open);
-                        
-                        if (handle != 0 && handle != 0xFFFFFFFF) {
-                            best_handle = handle;
-                        }
-                        
-                        if (ret_open >= 0) break;
+                // Ouvrir avec une VRAIE methode GPS (methode 0=NONE ne donne aucune donnee).
+                // Priorite : GPS pur (5), puis GPS+WIFI (2), AGPS+3G+WIFI (1), WIFI (3), 3G (4).
+                // L'A-GPS/WIFI-assist Sony etant HS, le GPS pur (5) est le plus fiable.
+                int methods[] = {5, 2, 1, 3, 4};
+                for (int mi = 0; mi < 5; mi++) {
+                    int i = methods[mi];
+                    handle = 0;
+                    ret_open = sceLocationOpen(&handle, i, 0);
+                    log_debug("sceLocationOpen(method,hmethod)", ret_open);
+                    log_debug("  -> method essayee", i);
+
+                    if (handle != 0 && handle != 0xFFFFFFFF) {
+                        best_handle = handle;
                     }
-                    if (ret_open >= 0) break;
+                    if (ret_open >= 0) {
+                        log_debug("  -> OUVERT avec method", i);
+                        break;
+                    }
                 }
                 
                 if (best_handle != 0 && best_handle != 0xFFFFFFFF) {
