@@ -19,13 +19,31 @@ set(VITA_VERSION  "01.00")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wshadow -O2")
 
+# libSceShaccCgExt (dépendance de vitashark) n'est pas fournie par le VitaSDK :
+# elle est compilée localement dans PSVITA/tools/SceShaccCgExt.
+find_library(SHACCCG_EXT_LIB SceShaccCgExt
+  HINTS "${CMAKE_SOURCE_DIR}/../tools/SceShaccCgExt/build"
+  NO_CMAKE_FIND_ROOT_PATH
+  REQUIRED)
+
 add_executable(${PROJECT_NAME}
   src/main.c
   src/map.c
+  src/gfx.c
+  src/text.c
+  src/sats.c
 )
 
 target_link_libraries(${PROJECT_NAME}
-  vita2d
+  vitaGL
+  stdc++
+  vitashark
+  ${SHACCCG_EXT_LIB}
+  mathneon
+  taihen_stub
+  SceShaccCg_stub
+  SceKernelDmacMgr_stub
+  SceIme_stub
   SceDisplay_stub
   SceGxm_stub
   SceCtrl_stub
@@ -36,6 +54,7 @@ target_link_libraries(${PROJECT_NAME}
   SceNet_stub
   SceNetCtl_stub
   SceHttp_stub
+  SceRegistryMgr_stub
   ScePgf_stub
   SceAppMgr_stub
   SceCommonDialog_stub
