@@ -19,6 +19,11 @@
 #include <taihen.h>
 
 static tai_hook_ref_t ref_load;
+static SceUID hook_load = -1;
+#ifdef GPS_TRACE_IPMI
+static tai_hook_ref_t ref_register, ref_invoke;
+static SceUID hook_register = -1, hook_invoke = -1;
+#endif
 static int done = 0;
 
 #define INT_LIB   0x098b0c75u
@@ -30,6 +35,73 @@ static int streq(const char*a,const char*b){while(*a&&*a==*b){a++;b++;}return *(
 static void wr(const char*s,unsigned n){SceUID fd=sceIoOpen("ux0:data/gps_activate.txt",SCE_O_WRONLY|SCE_O_CREAT|SCE_O_APPEND,0777);if(fd>=0){sceIoWrite(fd,s,n);sceIoClose(fd);}}
 static void ps(const char*s){wr(s,slen(s));}
 static void phex(uint32_t v){char b[11];b[0]='0';b[1]='x';const char*H="0123456789ABCDEF";for(int i=0;i<8;i++)b[2+i]=H[(v>>((7-i)*4))&0xF];b[10]=0;wr(b,10);}
+
+#ifdef GPS_TRACE_IPMI
+/* Experimental: disabled by default pending investigation of a console hang.
+ * IPMI virtual invoke: seven ARM ABI arguments, verified in the raw disassembly.
+ * The return value is transport status; *result is the separate server status. */
+static int traced_invoke(void *client, unsigned method, void *inputs, unsigned ni,
+                         int *result, void *outputs, unsigned no) {
+    struct _tai_hook_user *cur = (struct _tai_hook_user *)ref_invoke;
+    struct _tai_hook_user *next = (struct _tai_hook_user *)cur->next;
+    typedef int (*invoke_t)(void *, unsigned, void *, unsigned, int *, void *, unsigned);
+    invoke_t original = (invoke_t)(next ? next->func : cur->old);
+    int r = original(client, method, inputs, ni, result, outputs, no);
+    if (method == 0x12340000u) {
+        ps("[IPMI] register transport="); phex(r);
+        if (r == 0 && result) { ps(" server="); phex(*result); }
+        ps("\n");
+    }
+    return r;
+}
+
+static void hook_invoke_address(uintptr_t address) {
+    SceUID ids[192]; SceSize count = 192;
+    if (sceKernelGetModuleList(0xFF, ids, &count) < 0) return;
+    for (SceSize i = 0; i < count && i < 192; ++i) {
+        SceKernelModuleInfo mi; zero(&mi, sizeof mi); mi.size = sizeof mi;
+        if (sceKernelGetModuleInfo(ids[i], &mi) < 0) continue;
+        uintptr_t base = (uintptr_t)mi.segments[0].vaddr;
+        uintptr_t code = address & ~(uintptr_t)1;
+        if (code >= base && code - base < mi.segments[0].memsz) {
+            hook_invoke = taiHookFunctionOffset(&ref_invoke, ids[i], 0,
+                            code - base, address & 1, traced_invoke);
+            ps("[IPMI] invoke module="); ps(mi.module_name);
+            ps(" offset="); phex(code - base); ps(" hook="); phex(hook_invoke); ps("\n");
+            return;
+        }
+    }
+}
+
+static int traced_register(void *client, unsigned *handle, unsigned method,
+                           unsigned heading, unsigned flags, unsigned *reason) {
+    if (hook_invoke < 0 && client) {
+        uintptr_t *vtable = *(uintptr_t **)client;
+        if (vtable) hook_invoke_address(vtable[5]);
+    }
+    struct _tai_hook_user *cur = (struct _tai_hook_user *)ref_register;
+    struct _tai_hook_user *next = (struct _tai_hook_user *)cur->next;
+    typedef int (*register_t)(void *, unsigned *, unsigned, unsigned, unsigned, unsigned *);
+    register_t original = (register_t)(next ? next->func : cur->old);
+    int r = original(client, handle, method, heading, flags, reason);
+    ps("[REGISTER] method="); phex(method); ps(" flags="); phex(flags);
+    ps(" return="); phex(r); ps("\n");
+    return r;
+}
+
+static void install_trace(void) {
+    tai_module_info_t ti; zero(&ti, sizeof ti); ti.size = sizeof ti;
+    if (taiGetModuleInfo("SceLibLocation", &ti) < 0) return;
+    SceKernelModuleInfo mi; zero(&mi, sizeof mi); mi.size = sizeof mi;
+    if (sceKernelGetModuleInfo(ti.modid, &mi) < 0 || mi.segments[0].memsz != 0x33D0) return;
+    const unsigned char *p = (const unsigned char *)mi.segments[0].vaddr + 0x1F54;
+    if (p[0] != 0x2D || p[1] != 0xE9 || p[2] != 0xF0 || p[3] != 0x41) {
+        ps("[IPMI] unsupported register prologue; trace skipped\n"); return;
+    }
+    hook_register = taiHookFunctionOffset(&ref_register, ti.modid, 0, 0x1F54, 1, traced_register);
+    ps("[IPMI] register hook="); phex(hook_register); ps("\n");
+}
+#endif
 
 typedef struct { uint16_t size,version,flags,num_funcs; uint32_t num_vars,num_unk,lib_nid;
                  const char*lib_name; const uint32_t*nid_table; void*const*entry_table; } sce_exports_t;
@@ -52,7 +124,11 @@ static unsigned char* liblocation_seg1(void){
 }
 
 static void activate(void){
+#ifdef GPS_TRACE_IPMI
+    ps("--- ACTIVATE + IPMI DIAGNOSTIC 1 ---\n");
+#else
     ps("--- ACTIVATE ---\n");
+#endif
     unsigned char*s1=liblocation_seg1();
     if(!s1){ps("[ACT] seg1 introuvable\n");return;}
     *(volatile uint32_t*)(s1+0x30)=2;
@@ -73,6 +149,9 @@ static void activate(void){
     s1=liblocation_seg1();
     if(s1) ps(*(volatile uint32_t*)(s1+0x00)!=0 ? "[ACT] >>> contexte cree, appli peut ouvrir la localisation\n"
                                                 : "[ACT] contexte NULL (init KO)\n");
+#ifdef GPS_TRACE_IPMI
+    if (r == 0) install_trace();
+#endif
 }
 
 static int patched_load(uint16_t id){
@@ -85,7 +164,13 @@ static int patched_load(uint16_t id){
     return res;
 }
 int module_start(SceSize a,const void*b){(void)a;(void)b;
-    taiHookFunctionImport(&ref_load,TAI_MAIN_MODULE,TAI_ANY_LIBRARY,0x79A0160A,patched_load);
+    hook_load = taiHookFunctionImport(&ref_load,TAI_MAIN_MODULE,TAI_ANY_LIBRARY,0x79A0160A,patched_load);
     return SCE_KERNEL_START_SUCCESS;}
-int module_stop(SceSize a,const void*b){(void)a;(void)b;return SCE_KERNEL_STOP_SUCCESS;}
+int module_stop(SceSize a,const void*b){(void)a;(void)b;
+#ifdef GPS_TRACE_IPMI
+    if (hook_invoke >= 0) taiHookRelease(hook_invoke, ref_invoke);
+    if (hook_register >= 0) taiHookRelease(hook_register, ref_register);
+#endif
+    if (hook_load >= 0) taiHookRelease(hook_load, ref_load);
+    return SCE_KERNEL_STOP_SUCCESS;}
 int _start(SceSize a,const void*b) __attribute__((weak,alias("module_start")));

@@ -14,10 +14,10 @@ include("${VITASDK}/share/vita.cmake" REQUIRED)
 
 # Métadonnées de l'application (finissent dans param.sfo)
 set(VITA_APP_NAME "Go!Explore 2.0")
-set(VITA_TITLEID  "GPSX00001")   # On utilise l'ID d'Ecolibrium pour bypasser app.db
+set(VITA_TITLEID  "GPSX00001")
 set(VITA_VERSION  "01.00")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -O2")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wshadow -O2")
 
 add_executable(${PROJECT_NAME}
   src/main.c
@@ -30,6 +30,7 @@ target_link_libraries(${PROJECT_NAME}
   SceCtrl_stub
   SceSysmodule_stub
   SceLocation_stub
+  SceSysmem_stub
   SceAppUtil_stub
   SceNet_stub
   SceNetCtl_stub

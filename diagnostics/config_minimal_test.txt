@@ -1,0 +1,8 @@
+*main
+ur0:tai/henkaku.suprx
+# vitacompanion : FTP 1337 + commandes 1338 (launch/destroy/reboot) — accès distant
+ur0:tai/vitacompanion.suprx
+
+# GPS Activation (test mémoire kernel 13/09/2026 : config réduit au strict minimum)
+*GPSX00001
+ur0:tai/gps_activate.suprx

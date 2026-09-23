@@ -1,0 +1,18 @@
+--- ACTIVATE + IPMI DIAGNOSTIC 1 ---
+[ACT] flags: priv=0x00000002 flag34=0x00000001
+[ACT] 3500A98C -> 0x00000000
+[ACT] >>> contexte cree, appli peut ouvrir la localisation
+[IPMI] register hook=0x40010143
+[IPMI] invoke module=SceShellSvc offset=0x000047CE hook=0x40010187
+[IPMI] register transport=0x00000000 server=0x00000000
+[REGISTER] method=0x00000000 flags=0x00010000 return=0x00000000
+[IPMI] register transport=0x00000000 server=0x80024302
+[REGISTER] method=0x00000005 flags=0x00010000 return=0x80024302
+[IPMI] register transport=0x00000000 server=0x80024302
+[REGISTER] method=0x00000002 flags=0x00010000 return=0x80024302
+[IPMI] register transport=0x00000000 server=0x80024302
+[REGISTER] method=0x00000001 flags=0x00010000 return=0x80024302
+[IPMI] register transport=0x00000000 server=0x80024302
+[REGISTER] method=0x00000003 flags=0x00010000 return=0x80024302
+[IPMI] register transport=0x00000000 server=0x80024302
+[REGISTER] method=0x00000004 flags=0x00010000 return=0x80024302

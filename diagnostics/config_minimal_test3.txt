@@ -1,0 +1,20 @@
+*KERNEL
+ur0:tai/storagemgr.skprx
+
+*main
+# main is a special titleid for SceShell
+ur0:tai/henkaku.suprx
+ur0:tai/shellbat.suprx
+ur0:tai/custom_warning.suprx
+# vitacompanion : FTP 1337 + commandes 1338 (launch/destroy) — dev a distance
+ur0:tai/vitacompanion.suprx
+*NPXS10015
+# this is for modifying the version string
+ur0:tai/henkaku.suprx
+*NPXS10016
+# this is for modifying the version string in settings widget
+ur0:tai/henkaku.suprx
+
+# GPS Activation (test mémoire kernel 13/09/2026 : config réduit — storagemgr/henkaku/shellbat/custom_warning/vitacompanion/gps_activate conservés uniquement)
+*GPSX00001
+ur0:tai/gps_activate.suprx

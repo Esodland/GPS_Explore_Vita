@@ -1,0 +1,44 @@
+--- GPS MEMORY DIAGNOSTIC 1 ---
+[MEM] entry ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[DEBUG] sceSysmoduleLoadModule(APPUTIL) : 0x00000000
+[DEBUG] sceAppUtilInit : 0x00000000
+[MEM] after APPUTIL ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[DEBUG] sceSysmoduleLoadModule(NET) : 0x00000000
+[DEBUG] sceNetInit : 0x00000000
+[DEBUG] sceNetCtlInit : 0x00000000
+[MEM] before LOCATION activation ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[DEBUG] sceSysmoduleLoadModule(LOCATION) : 0x00000000
+[MEM] after LOCATION activation ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[DEBUG] open method : 0x00000000
+[MEM] before open ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[MEM] after open ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[DEBUG] sceLocationOpen : 0x00000000
+[DEBUG] returned handle : 0x80000000
+[DEBUG] probe close : 0x00000000
+[MEM] after probe close ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[DEBUG] open method : 0x00000005
+[MEM] before open ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[MEM] after open ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[DEBUG] sceLocationOpen : 0x80024302
+[DEBUG] returned handle : 0xFFFFFFFF
+[DEBUG] open method : 0x00000002
+[MEM] before open ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[MEM] after open ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[DEBUG] sceLocationOpen : 0x80024302
+[DEBUG] returned handle : 0xFFFFFFFF
+[DEBUG] open method : 0x00000001
+[MEM] before open ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[MEM] after open ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[DEBUG] sceLocationOpen : 0x80024302
+[DEBUG] returned handle : 0xFFFFFFFF
+[DEBUG] open method : 0x00000003
+[MEM] before open ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[MEM] after open ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[DEBUG] sceLocationOpen : 0x80024302
+[DEBUG] returned handle : 0xFFFFFFFF
+[DEBUG] open method : 0x00000004
+[MEM] before open ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[MEM] after open ret=0x00000000 user=126877696 cdram=117440512 phycont=27262976 bytes
+[DEBUG] sceLocationOpen : 0x80024302
+[DEBUG] returned handle : 0xFFFFFFFF
+[MEM] after vita2d and font ret=0x00000000 user=116391936 cdram=93323264 phycont=27262976 bytes
