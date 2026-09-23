@@ -21,6 +21,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wshadow -O2")
 
 add_executable(${PROJECT_NAME}
   src/main.c
+  src/map.c
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -34,6 +35,7 @@ target_link_libraries(${PROJECT_NAME}
   SceAppUtil_stub
   SceNet_stub
   SceNetCtl_stub
+  SceHttp_stub
   ScePgf_stub
   SceAppMgr_stub
   SceCommonDialog_stub

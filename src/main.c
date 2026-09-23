@@ -3,6 +3,7 @@
 #include <string.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/sysmem.h>
+#include <psp2/kernel/threadmgr.h>
 #include <psp2/sysmodule.h>
 #include <psp2/location.h>
 #include <psp2/ctrl.h>
@@ -11,6 +12,14 @@
 #include <psp2/net/netctl.h>
 #include <vita2d.h>
 #include <malloc.h>
+
+#include "map.h"
+
+/* Panneau carte, côté droit de l'écran 960x544 */
+#define MAP_X 500
+#define MAP_Y 24
+#define MAP_W 440
+#define MAP_H 480
 
 void log_debug(const char* msg, int code) {
     FILE* f = fopen("ux0:/data/gps_debug.txt", "a");
@@ -56,6 +65,82 @@ static void probe_methods(void) {
             log_debug("probe close", sceLocationClose(probe));
             log_memory("after probe close");
         }
+    }
+}
+
+/*
+ * sceLocationGetLocation bloque jusqu'au fix : on l'appelle depuis un thread
+ * dédié, la boucle d'affichage ne lit que le dernier résultat publié.
+ */
+typedef struct {
+    SceKernelLwMutexWork lock;
+    SceLocationHandle handle;
+    volatile int stop;
+    int calls;      /* appels terminés */
+    int fixes;      /* appels réussis */
+    int last_ret;
+    SceLocationLocationInfo last_fix;
+} LocationWorker;
+
+static int location_thread(SceSize args, void *argp) {
+    (void)args;
+    LocationWorker *w = *(LocationWorker **)argp;
+    while (!w->stop) {
+        SceLocationLocationInfo info;
+        memset(&info, 0, sizeof(info));
+        int result = sceLocationGetLocation(w->handle, &info);
+        if (w->stop) break;
+
+        sceKernelLockLwMutex(&w->lock, 1, NULL);
+        w->calls++;
+        w->last_ret = result;
+        if (result == 0) {
+            w->fixes++;
+            w->last_fix = info;
+        }
+        int calls = w->calls;
+        sceKernelUnlockLwMutex(&w->lock, 1);
+
+        FILE *log_file = fopen("ux0:/data/gps_log.txt", "a");
+        if (log_file) {
+            fprintf(log_file, "[Appel %d] sceLocationGetLocation: 0x%08X (Lat: %f, Lon: %f, Precision: %.1f m)\n",
+                    calls, (unsigned)result, info.latitude, info.longitude, info.accuracy);
+            fclose(log_file);
+        }
+        sceKernelDelayThread(1000 * 1000);
+    }
+    return 0;
+}
+
+static SceUID start_location_worker(LocationWorker *w, SceLocationHandle handle) {
+    memset(w, 0, sizeof(*w));
+    w->handle = handle;
+    int ret = sceKernelCreateLwMutex(&w->lock, "GpsFixLock", 0, 0, NULL);
+    if (ret < 0) return ret;
+    SceUID thid = sceKernelCreateThread("GpsFixThread", location_thread, 0x10000100, 0x4000, 0, 0, NULL);
+    if (thid < 0) {
+        sceKernelDeleteLwMutex(&w->lock);
+        return thid;
+    }
+    ret = sceKernelStartThread(thid, sizeof(w), &w);
+    if (ret < 0) {
+        sceKernelDeleteThread(thid);
+        sceKernelDeleteLwMutex(&w->lock);
+        return ret;
+    }
+    return thid;
+}
+
+static void stop_location_worker(LocationWorker *w, SceUID thid) {
+    w->stop = 1;
+    /* Débloque un GetLocation en attente de fix ; échoue sans effet si aucun appel n'est en cours. */
+    log_debug("cancel get location", sceLocationCancelGetLocation(w->handle));
+    SceUInt timeout = 5 * 1000 * 1000;
+    int ret = sceKernelWaitThreadEnd(thid, NULL, &timeout);
+    log_debug("wait location thread", ret);
+    if (ret >= 0) {
+        sceKernelDeleteThread(thid);
+        sceKernelDeleteLwMutex(&w->lock);
     }
 }
 
@@ -109,6 +194,11 @@ int main(int argc, char *argv[]) {
     vita2d_pgf *font = vita2d_load_default_pgf();
     log_memory("after vita2d and font");
 
+    int ret_map = map_init();
+    log_debug("map_init", ret_map);
+    log_memory("after map init");
+    int map_zoom = MAP_ZOOM_DEFAULT;
+
     SceLocationHandle handle = 0;
     int ret_open = -1;
     int last_error = 0;
@@ -116,8 +206,9 @@ int main(int argc, char *argv[]) {
     int handle_open = 0;
     int gps_state = 0; // 0 = Attente, 1 = Demande permission, 2 = Actif, -1 = Erreur
 
-    SceLocationLocationInfo location;
-    memset(&location, 0, sizeof(location));
+    static LocationWorker worker;
+    SceUID worker_thid = -1;
+    int search_start_frame = 0;
 
     int frame = 0;
     int prev_buttons = 0;
@@ -138,6 +229,10 @@ int main(int argc, char *argv[]) {
         
         // Détecter un appui (front montant) sur CROIX
         int cross_pressed = (pad.buttons & SCE_CTRL_CROSS) && !(prev_buttons & SCE_CTRL_CROSS);
+        if ((pad.buttons & SCE_CTRL_RTRIGGER) && !(prev_buttons & SCE_CTRL_RTRIGGER) && map_zoom < MAP_ZOOM_MAX)
+            map_zoom++;
+        if ((pad.buttons & SCE_CTRL_LTRIGGER) && !(prev_buttons & SCE_CTRL_LTRIGGER) && map_zoom > MAP_ZOOM_MIN)
+            map_zoom--;
         prev_buttons = pad.buttons;
 
         vita2d_start_drawing();
@@ -189,7 +284,16 @@ int main(int argc, char *argv[]) {
                 log_debug("confirm result call", ret);
                 log_debug("confirm result", result);
                 if (ret == 0 && result == SCE_LOCATION_DIALOG_RESULT_ENABLE) {
-                    gps_state = 2;
+                    worker_thid = start_location_worker(&worker, handle);
+                    log_debug("start location thread", worker_thid);
+                    if (worker_thid >= 0) {
+                        search_start_frame = frame;
+                        gps_state = 2;
+                    } else {
+                        last_error = worker_thid;
+                        error_stage = "thread GPS";
+                        gps_state = -1;
+                    }
                 } else {
                     last_error = ret ? ret : (int)SCE_LOCATION_INFO_DENIED_BY_USER;
                     error_stage = "consentement";
@@ -202,7 +306,7 @@ int main(int argc, char *argv[]) {
             vita2d_pgf_draw_text(font, 20, 50, RGBA8(255, 50, 50, 255), 1.2f, err_buf);
             const char *detail = "Consultez gps_debug.txt pour le diagnostic.";
             switch ((unsigned)last_error) {
-                case 0x80024302: detail = "Memoire physique indisponible : pool a identifier."; break;
+                case 0x80024302: detail = "SceShell sans memoire : retirer un plugin *main."; break;
                 case 0x80101244: detail = "Methode de localisation invalide."; break;
                 case 0x8010124F: detail = "Session de localisation non activee."; break;
                 case 0x80101249: detail = "Application non autorisee pour la localisation."; break;
@@ -212,22 +316,18 @@ int main(int argc, char *argv[]) {
             vita2d_pgf_draw_text(font, 20, 140, RGBA8(200, 200, 200, 255), 1.0f, "CROIX : revenir au test. START : quitter.");
             if (cross_pressed) gps_state = 0;
         } else if (gps_state == 2) {
-            // 3. Récupérer les coordonnées actuelles
-            ret = sceLocationGetLocation(handle, &location);
+            // 3. Lire le dernier résultat publié par le thread GPS (jamais bloquant)
+            sceKernelLockLwMutex(&worker.lock, 1, NULL);
+            int calls = worker.calls;
+            int fixes = worker.fixes;
+            int last_ret = worker.last_ret;
+            SceLocationLocationInfo location = worker.last_fix;
+            sceKernelUnlockLwMutex(&worker.lock, 1);
 
-            // Log toutes les 60 frames (environ 1 sec)
-            if (frame % 60 == 0) {
-                FILE *log_file = fopen("ux0:/data/gps_log.txt", "a");
-                if (log_file) {
-                    fprintf(log_file, "[Frame %d] sceLocationGetLocation: 0x%08X (Lat: %f, Lon: %f)\n", frame, ret, location.latitude, location.longitude);
-                    fclose(log_file);
-                }
-            }
-
-            if (ret == 0) {
+            if (fixes > 0) {
                 char buf[128];
-                
-                snprintf(buf, sizeof(buf), "GPS Status: FIX OBTENU");
+
+                snprintf(buf, sizeof(buf), "GPS Status: FIX OBTENU (%d)", fixes);
                 vita2d_pgf_draw_text(font, 20, 50, RGBA8(0, 255, 0, 255), 1.2f, buf);
 
                 snprintf(buf, sizeof(buf), "Latitude  : %f", location.latitude);
@@ -241,6 +341,18 @@ int main(int argc, char *argv[]) {
 
                 snprintf(buf, sizeof(buf), "Vitesse   : %.1f km/h", location.speed * 3.6f);
                 vita2d_pgf_draw_text(font, 20, 190, RGBA8(255, 255, 255, 255), 1.0f, buf);
+
+                snprintf(buf, sizeof(buf), "Precision : %.1f m", location.accuracy);
+                vita2d_pgf_draw_text(font, 20, 220, RGBA8(255, 255, 255, 255), 1.0f, buf);
+
+                if (last_ret != 0) {
+                    snprintf(buf, sizeof(buf), "Dernier appel : 0x%08X", (unsigned)last_ret);
+                    vita2d_pgf_draw_text(font, 20, 260, RGBA8(255, 165, 0, 255), 1.0f, buf);
+                    vita2d_pgf_draw_text(font, 20, 285, RGBA8(255, 165, 0, 255), 1.0f, "(dernier fix conserve)");
+                }
+
+                map_draw(font, MAP_X, MAP_Y, MAP_W, MAP_H,
+                         location.latitude, location.longitude, location.accuracy, map_zoom);
             } else {
                 char anim[4] = {0};
                 int dots = (frame / 20) % 4; // Change tous les tiers de seconde (à 60fps)
@@ -252,16 +364,23 @@ int main(int argc, char *argv[]) {
                 vita2d_pgf_draw_text(font, 20, 50, RGBA8(255, 165, 0, 255), 1.2f, search_text);
                 
                 char err_buf[128];
-                snprintf(err_buf, sizeof(err_buf), "Statut SceLocation : 0x%08X", ret);
+                if (calls == 0)
+                    snprintf(err_buf, sizeof(err_buf), "En attente du premier fix : %d s", (frame - search_start_frame) / 60);
+                else
+                    snprintf(err_buf, sizeof(err_buf), "Statut SceLocation : 0x%08X (%d appels)", (unsigned)last_ret, calls);
                 vita2d_pgf_draw_text(font, 20, 90, RGBA8(200, 200, 200, 255), 1.0f, err_buf);
                 
                 vita2d_pgf_draw_text(font, 20, 120, RGBA8(150, 150, 150, 255), 1.0f, "Assurez-vous d'etre en exterieur.");
                 
-                // Micro animation de radar simple
+                // Micro animation de radar simple, centrée sur le panneau carte
                 int radar_radius = (frame % 60);
-                vita2d_draw_fill_circle(480, 272, radar_radius, RGBA8(0, 255, 0, 100 - (radar_radius)));
+                map_draw_placeholder(font, MAP_X, MAP_Y, MAP_W, MAP_H, "Carte : en attente du premier fix");
+                vita2d_draw_fill_circle(MAP_X + MAP_W / 2, MAP_Y + MAP_H / 2 + 40, radar_radius,
+                                        RGBA8(0, 255, 0, 100 - (radar_radius)));
             }
         }
+        if (gps_state != 2)
+            map_draw_placeholder(font, MAP_X, MAP_Y, MAP_W, MAP_H, "Carte : en attente du premier fix");
         
         // Affichage de la version en bas à gauche
         char version_buf[64];
@@ -272,10 +391,12 @@ int main(int argc, char *argv[]) {
         vita2d_swap_buffers();
     }
 
-    // Nettoyage
+    // Nettoyage : arrêter le thread avant de fermer le handle qu'il utilise
+    if (worker_thid >= 0) stop_location_worker(&worker, worker_thid);
     if (handle_open) sceLocationClose(handle);
     sceSysmoduleUnloadModule(SCE_SYSMODULE_LOCATION);
-    
+
+    if (ret_map >= 0) map_fini();
     vita2d_free_pgf(font);
     vita2d_fini();
     
