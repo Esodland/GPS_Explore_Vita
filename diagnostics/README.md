@@ -1,5 +1,7 @@
 # Diagnostic mémoire — 12 septembre 2026
 
+Pour l'essai GPS isolé du 24/09 et l'incident de console, voir [`minimal-gps-protocol.md`](minimal-gps-protocol.md).
+
 Essai exécuté sur la PCH-1100 via vitacompanion, avec le plugin d'activation précédent et le nouvel eboot. Aucune modification de app.db, param.sfo ou tai/config.txt.
 
 Le journal `2026-09-12-memory.txt` contient les mesures en octets retournées par `sceKernelGetFreeMemorySize` avant/après activation, avant/après chaque open, après close et après vita2d.

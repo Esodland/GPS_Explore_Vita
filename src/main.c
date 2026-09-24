@@ -159,7 +159,8 @@ static SceUID start_location_worker(LocationWorker *w, SceLocationHandle handle)
     return thid;
 }
 
-static void stop_location_worker(LocationWorker *w, SceUID thid) {
+/* Return true only once the worker has stopped using the location handle. */
+static int stop_location_worker(LocationWorker *w, SceUID thid) {
     w->stop = 1;
     /* Débloque un GetLocation en attente de fix ; échoue sans effet si aucun appel n'est en cours. */
     log_debug("cancel get location", sceLocationCancelGetLocation(w->handle));
@@ -169,7 +170,9 @@ static void stop_location_worker(LocationWorker *w, SceUID thid) {
     if (ret >= 0) {
         sceKernelDeleteThread(thid);
         sceKernelDeleteLwMutex(&w->lock);
+        return 1;
     }
+    return 0;
 }
 
 /* Satellites lus dans les trames NMEA du journal Sony : compteurs et barres de signal. */
@@ -546,9 +549,14 @@ int main(int argc, char *argv[]) {
     }
 
     // Nettoyage : arrêter le thread avant de fermer le handle qu'il utilise
-    if (worker_thid >= 0) stop_location_worker(&worker, worker_thid);
-    if (handle_open) sceLocationClose(handle);
-    sceSysmoduleUnloadModule(SCE_SYSMODULE_LOCATION);
+    int worker_stopped = worker_thid < 0 || stop_location_worker(&worker, worker_thid);
+    if (worker_stopped) {
+        if (handle_open) log_debug("close on exit", sceLocationClose(handle));
+        log_debug("unload LOCATION", sceSysmoduleUnloadModule(SCE_SYSMODULE_LOCATION));
+    } else {
+        /* The process is about to exit; never close a handle still used by the worker. */
+        log_debug("skip close: GPS worker still running", 0);
+    }
 
     sats_stop();
     if (ret_map >= 0) map_fini();

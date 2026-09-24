@@ -19,6 +19,24 @@ set(VITA_VERSION  "01.00")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wshadow -O2")
 
+option(GPS_MINIMAL_DIAGNOSTIC "Build a GPS-only logging diagnostic" OFF)
+
+if(GPS_MINIMAL_DIAGNOSTIC)
+  add_executable(${PROJECT_NAME} src/minimal_diagnostic.c)
+  target_link_libraries(${PROJECT_NAME}
+    SceCtrl_stub
+    SceSysmodule_stub
+    SceLocation_stub
+    SceAppUtil_stub
+    SceRtc_stub
+    SceIofilemgr_stub
+    SceKernelThreadMgr_stub
+    SceProcessmgr_stub
+    c
+    gcc
+  )
+else()
+
 # libSceShaccCgExt (dépendance de vitashark) n'est pas fournie par le VitaSDK :
 # elle est compilée localement dans PSVITA/tools/SceShaccCgExt.
 find_library(SHACCCG_EXT_LIB SceShaccCgExt
@@ -66,6 +84,7 @@ target_link_libraries(${PROJECT_NAME}
   c
   gcc
 )
+endif()
 
 # ELF -> eboot.bin (format SELF signé "fake" accepté par HENkaku)
 vita_create_self(eboot.bin ${PROJECT_NAME} UNSAFE "-a" "0x2800000000000018")

@@ -1,6 +1,6 @@
 # Go!Explore 2.0 (PS Vita Homebrew)
 
-> **Statut : autorisation débloquée ; les méthodes GPS échouent encore — appel fautif identifié.** Le 13/09/2026, `gps.skprx` a été extrait de `bootimage.skprx` et désassemblé (outillage installé localement : `pyelftools` + `capstone`). L'appel exact a été localisé : `ksceKernelCreateHeap("SceGps", 0x2000, NULL)` — une requête de seulement 8 Kio sur le pool de mémoire physique **réservé au kernel** (distinct des pools USER/CDRAM/PHYCONT du client). Un test terrain (Photos échoue aussi en extérieur à ciel dégagé) confirme qu'il s'agit d'un problème **systémique**, pas d'un défaut de privilège homebrew. Un essai de `config.txt` réduit pour tester la piste « pression mémoire kernel » a été suspendu après plusieurs incidents en cascade (tous récupérés) ; **baseline reconfirmée stable** (`NONE` réussit, méthodes réelles → `0x80024302`).
+> **Statut au 24/09/2026 : le service GPS s'ouvre et a renvoyé des positions ; la régularité d'un fix satellite reste à établir.** Désactiver `vdb_daemon` sous `*main` a levé `0x80024302` pour les méthodes réelles. Une première session a placé la console près de sa position réelle, mais des captures NMEA ultérieures indiquent zéro satellite utilisé et une position erronée. Le succès de `sceLocationGetLocation` ne démontre donc pas, à lui seul, un fix satellite. Voir `diagnostics/minimal-gps-protocol.md` pour l'essai isolé en cours.
 
 Application homebrew **GPS_Explore** (Go!Explore 2.0) pour PlayStation Vita : démonstrateur d'accès au module `SceLocation`. Cible matérielle : **PCH-1100 (OLED 3G)** — le seul modèle Vita avec une puce GPS.
 
@@ -44,7 +44,7 @@ Chaque palier vérifié sur la console 3G :
 - **Autorisation par appli** : elle n'est **pas** dans le `param.sfo` (prouvé : `ecolibrium`, le vrai jeu GPS, est un jeu normal `ATTRIBUTE=2`). Elle est dans `app.db`, clé `2840145610` (Ecolibrium `PCSF00092`=1, Photos=3, near=`0x80000003`). L'ajout à `GPSX00001` élimine `0x80101249`.
 - **Résolution d'exports non documentés** : walk de la table d'exports via `taiGetModuleInfo` (voir `resolve_export`).
 
-### Dernier obstacle : mémoire physique
+### Obstacle mémoire physique résolu pour cette console
 Ouvrir une **vraie** méthode GPS (1=AGPS+3G+WIFI, 2=GPS+WIFI, 5=GPS…) au lieu de 0=NONE :
 
 ```
@@ -56,7 +56,7 @@ sceLocationOpen(method=5 GPS) -> 0x80024302 = SCE_KERNEL_ERROR_NO_FREE_PHYSICAL_
 - Mesures client avant vita2d : **121 Mio USER, 112 Mio CDRAM, 26 Mio PHYCONT**, disponibles avant et après chaque ouverture.
 - La trace de la commande register `0x12340000` distingue **transport = 0**, **réponse serveur = 0x80024302**. L'attribution antérieure à un budget homebrew insuffisant ou à une allocation locale interne à SceIpmi n'était pas démontrée.
 
-Le code désigne une erreur de mémoire physique, mais ne révèle pas encore le pool, la taille ni les contraintes de l'allocation côté serveur. Journaux et limites : **`diagnostics/README.md`**. La sonde IPMI expérimentale a été suivie d'une erreur console ; le plugin précédent a été restauré et vérifié.
+Cette erreur provenait du chargement de `liblocation_provider.suprx` dans SceShell. La désactivation de `vdb_daemon` sous `*main` l'a levée sur cette console. Journaux et limites : **`diagnostics/README.md`**. La sonde IPMI expérimentale a été suivie d'une erreur console ; le plugin précédent a été restauré et vérifié.
 
 ### Progression complète des erreurs
 `0x8010124F` (gate client) → *flags + init `3500A98C`* → `0x80101249` (appli non autorisée) → *`app.db` clé `2840145610`* → `0x80024302 / NO_FREE_PHYSICAL_PAGE` (réponse du serveur ; ressource exacte inconnue).
@@ -89,9 +89,11 @@ Tentative de retirer les plugins taiHEN non essentiels (après recherche publiqu
 **Leçon :** ne plus éditer `app.db` par écriture directe pendant que le shell tourne ; ne retirer qu'un seul plugin de `config.txt` à la fois, avec vérification après chaque reboot.
 
 ### Prochaines pistes
-1. Mesurer l'état réel du pool mémoire kernel (au-delà des chiffres USER/CDRAM/PHYCONT déjà obtenus côté client).
-2. Retenter le test `config.txt` minimal, mais un seul plugin à la fois avec vérification systématique.
-3. Adapter les ressources seulement après cette identification ; les mesures actuelles ne justifient pas une augmentation du budget du client.
+La migration de la console `3.60 変革-11` vers `3.74` (HENlo), puis `Quick 3.65 Install` (Ensō permanent) a été effectuée le 25/09 : version affichée **`3.65 変革-2`**. Le nouveau `config.txt` ne charge pas StorageMgr ; YAMT Lite est présent et fonctionne. La SD2Vita est lisible en `uma0:` quand la carte Sony est `ux0:`. Dans le File Manager intégré de VitaDeploy, l'utilisateur a temporairement monté la SD2Vita en `ux0:` puis lancé **Refresh LiveArea** : **57 éléments** actualisés. La nouvelle base `app.db` contient bien l'enregistrement et l'icône `GPSX00001`, mais toujours pas sa permission GPS. Le plugin `gps_activate.suprx` est présent sans être chargé par la configuration 3.65. Prochaine étape : fixer YAMT sur `ux0: = SD2Vita`, redémarrer et vérifier les bulles, puis restaurer la chaîne GPS. Détails dans [`diagnostics/firmware-migration-3.65.md`](diagnostics/firmware-migration-3.65.md). La sauvegarde pré-migration comprend 48 fichiers de configuration/GPS et **8 630 fichiers de sauvegardes Vita/PSP et de trophées** sur SD2Vita et carte Sony (670 Mo), tous vérifiés localement sous `build/firmware-backup/pre-migration-3.60/`.
+
+1. ~~Montage SD2Vita en `ux0:`, plugins GPS et autorisation `app.db`~~ : rétablis le 25/09 (StorageMgr, `id.dat` renommé, `gps_activate.suprx` fonctionne en 3.65). Détails : `diagnostics/firmware-migration-3.65.md`.
+2. Comparer les trames NMEA et un fix extérieur à la baseline 3.60 ; ne réutiliser la sonde minimale qu'après analyse de l'extinction du 24/09.
+3. Séparer dans l'interface « position disponible » et « fix satellite confirmé » ; ensuite stabiliser les permissions et la cartographie hors ligne.
 
 ---
 
