@@ -12,6 +12,7 @@
 #include <psp2/net/netctl.h>
 #include <psp2/registrymgr.h>
 #include <psp2/io/stat.h>
+#include <psp2/appmgr.h>
 #include <math.h>
 #include <malloc.h>
 
@@ -261,8 +262,8 @@ int main(int argc, char *argv[]) {
         int previous = -1;
         log_debug("regmgr get enable_log", sceRegMgrGetKeyInt("/CONFIG/LOCATION", "enable_log", &previous));
         log_debug("enable_log previous", previous);
-        /* Masque : 1 Skyhook, 2 pilote GPS, 4 NMEA, 8 localisation, 0x20+ divers. */
-        log_debug("regmgr set enable_log=0xEF", sceRegMgrSetKeyInt("/CONFIG/LOCATION", "enable_log", 0xEF));
+        /* Masque : 1 Skyhook, 2 pilote GPS, 4 NMEA, 8 localisation, 0x10 ext, 0x20 etc. */
+        log_debug("regmgr set enable_log=0xFF", sceRegMgrSetKeyInt("/CONFIG/LOCATION", "enable_log", 0xFF));
     }
 
     int ret_loc = sceSysmoduleLoadModule(SCE_SYSMODULE_LOCATION);
@@ -274,6 +275,10 @@ int main(int argc, char *argv[]) {
     log_debug("gfx_init (vitaGL)", ret_gfx);
     if (ret_gfx < 0) sceKernelExitProcess(0);
     log_debug("text_init", text_init());
+    /* Barre système (réseau, batterie, heure) affichée par-dessus l'appli, translucide. */
+    log_debug("infobar", sceAppMgrSetInfobarState(SCE_APPMGR_INFOBAR_VISIBILITY_VISIBLE,
+                                                  SCE_APPMGR_INFOBAR_COLOR_BLACK,
+                                                  SCE_APPMGR_INFOBAR_TRANSPARENCY_TRANSLUCENT));
     log_memory("after vitaGL and font");
 
     int ret_map = map_init();
@@ -493,8 +498,8 @@ int main(int argc, char *argv[]) {
                     else
                         snprintf(buf, sizeof(buf), "%.1f km/h   precision %.0f m   fix %d",
                                  location.speed * 3.6f, location.accuracy, fixes);
-                    gfx_rect(SCREEN_W / 2 - 170, 6, 340, 26, RGBA8(20, 20, 30, 190));
-                    text_draw(SCREEN_W / 2 - 160, 25, RGBA8(255, 255, 255, 255), 0.9f, buf);
+                    gfx_rect(SCREEN_W / 2 - 170, 38, 340, 26, RGBA8(20, 20, 30, 190));
+                    text_draw(SCREEN_W / 2 - 160, 57, RGBA8(255, 255, 255, 255), 0.9f, buf);
                 }
             } else {
                 char anim[4] = {0};
