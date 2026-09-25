@@ -378,3 +378,70 @@ Le 24/09, une sonde dédiée sans moteur graphique, HTTP ou balayage des méthod
 Vers 23:00, la console a cessé de répondre ; au redémarrage, elle a affiché un message d'erreur de dernière utilisation. Batterie ensuite à 49 %, fonctionnement normal. La cause de cet incident n'est pas établie ; aucun dump nouveau daté de cet essai n'a été trouvé. L'eboot original a été immédiatement restauré et vérifié par SHA-256. La version suivante de la sonde, qui empêche la veille, a été compilée mais **pas déployée** après l'incident. Détails, limites et sauvegardes : `diagnostics/minimal-gps-protocol.md`.
 
 **Suite prudente :** analyser le dernier journal Sony hors ligne lorsqu'il peut être récupéré sans perturber la console, réduire la verbosité de `enable_log=0xFF`, puis comparer un essai GPS pur avec une méthode assistée. Ne conclure ni à une panne matérielle ni à une cause vitaGL sur les seules données actuelles.
+
+## 25/09/2026 — Firmware 3.65 : zéro satellite confirmé, application Photos comprise
+
+Essais en extérieur sur la PCH-1100 en 3.65 (Ensō), chaîne d'activation inchangée (`gps_activate.suprx`, clé `app.db`, consentement accepté). Journaux Sony `ux0:/liblocation/liblocation_20260925_*.log` analysés hors ligne, conservés hors Git. Aucune modification de la console pendant l'analyse.
+
+**GPSX00001, méthode 5, environ 13 minutes dehors :** 723 trames sur 723 à `Satellite Num [0]`, `$GPGGA` qualité 1 avec 0 satellite utilisé et `$GPGSA` sans aucun numéro de satellite. Aucune trame `$GPGSV`. Chaque appel à `sceLocationGetLocation` suit le même cycle : `PositionManager::GetPosition()` renvoie `0x80101287` en ~0,1 s, puis ~15 s plus tard `GetLocationCache()` renvoie `0x80101200` (`SCE_LOCATION_INFO_UNDETERMINED_LOCATION`), qui est le code reçu par l'appli. `0x80101287` n'est pas nommé dans `psp2/location.h` (qui s'arrête à `0x80101286`) : c'est un code interne au serveur ; sens probable « pas de position disponible », non vérifié.
+
+**La position rapportée par la puce n'est pas un fix.** La position `4659.9997,N,00359.9999,E` (47°00′N 4°00′E, altitude 0) est présente dès la première trame, avant toute recherche, avec qualité 1 et 0 satellite. Elle figurait déjà dans les journaux du 23/09. Après l'arrêt brutal du 25/09 (ci-dessous), elle est devenue `0000.0000,00000.0000`. C'est donc une position conservée par la puce, pas une mesure. Ne pas interpréter `quality=1` seul comme un fix.
+
+**Horloge de la puce : preuve qu'elle ne reçoit plus de satellites depuis le 23/09.** Écart entre l'heure GGA et l'horloge de la console (juste à la seconde près le 25/09) :
+
+| Journal | Écart GGA − console |
+|---|---|
+| 23/09 au soir (`sony2.log`) | +18 s, soit exactement l'écart GPS−UTC : horloge alors calée sur les satellites |
+| 25/09 | +32,8 s |
+
+Environ 15 s de dérive en deux jours : l'horloge interne de la puce tourne librement. La date reste affichée en 2007 (effet du retour à zéro du compteur de semaines GPS, voir plus haut), mais c'était déjà le cas pendant le fix du 23/09.
+
+**Application Photos (Sony), environ 9 minutes dehors :** ouverture avec la méthode 1 (GPS + 3G + Wi‑Fi) et suivi de position en continu (`StartLocationCallback`), autorisation `0x0`. Résultat identique : 575 trames sur 575 à 0 satellite, `0x80101287` / `0x80101200`, aucune position. La première recherche est arrêtée par Photos au bout d'environ 21 s, puis relancée. Les autres sources échouent aussi : `scePosBbmcReqCellLocationInfo` → `0x80330006` (réseau mobile coupé à ce moment), recherche Wi‑Fi sans résultat (`ssidsNum[0]`), requêtes vers le serveur Skyhook en échec (`request failed`, `TilingRQ failed`), probablement parce que le service n'existe plus. La boussole fonctionne (`GetHeading()` → `0x0`).
+
+**Conclusion.** Deux applications, deux méthodes et deux modes d'appel donnent le même résultat au niveau du pilote (`scePosGpsGetData`, sous la couche d'autorisation). L'homebrew, le plugin, la clé `app.db` et le consentement sont écartés. La réception est en cause : puce GPS du MDM6200 sur la carte ZOE, câble coaxial GPS (câble central de la carte ZOE) ou antenne GPS (circuit souple en cuivre collé dans la coque, d'après psdevwiki). Le pilote `bbmc` connaît deux modems (`HWID_QUALCOMM_MDM6200` et `HWID_QUALCOMM_MDM6600`). La carte de la console est une ZOE `1-489-770-11` ; comparaison des révisions : [`diagnostics/zoe-1489770-11-vs-21.md`](diagnostics/zoe-1489770-11-vs-21.md).
+
+**Arrêt brutal du 25/09 vers 15:38:54 UTC.** Le journal Sony s'arrête net en pleine session GPS, sans fermeture. L'utilisateur coupait probablement le réseau mobile dans les Paramètres à ce moment-là, avec l'appli GPS toujours ouverte (ordre à confirmer). Aucun nouveau `psp2core-*.psp2dmp` sur `ux0:` ni `uma0:`. Même symptôme que l'arrêt du 24/09 vers 23:00, lui aussi pendant une session GPS. Précaution : ne pas changer le réglage réseau mobile pendant qu'une session GPS est ouverte.
+
+**Suite.** Pièces commandées le 25/09, arrivée prévue courant octobre : câbles coaxiaux et trois cartes ZOE `1-489-770-21` de provenances différentes. Ordre des essais, une variable à la fois : câble GPS neuf avec la carte d'origine, puis chaque carte ZOE, puis l'antenne de la coque. Critère : 15 minutes dehors au même endroit, une seule lecture du journal, en regardant d'abord `Satellite Num [n] > 0`, qui prouve une réception avant même un fix.
+
+## 25/09/2026 soir — Injection de l'heure : la chaîne d'aide XTRA se déclenche, toujours zéro satellite
+
+### Commandes `sceGpsIoctl` (relevées dans `shell.self` et `gps.elf` 3.60)
+
+`_sceGpsIoctl(cmd, arg, size, io)` : le noyau lit dans `io[0]` la taille à copier (≤ `0x640`), exécute la commande puis recopie `arg` vers l'appelant. Il n'accepte que les programmes système (`ksceSblACMgrIsSystemProgram`, sauf console de développement). Il vérifie ensuite l'état de SceGps, que `(cmd & 0xF000) == 0x1000` et que le préfixe est `0x5` (écriture) ou `0xA` (lecture).
+
+| Commande | Code | Taille | Contenu |
+|---|---|---|---|
+| Lecture non identifiée, avant `TimeSet` | `0xAB001001` | 4 | valeur lue 0 |
+| Infos XTRA | `0xAB001000` | `0x404` | u16 taille max, u8 nombre d'adresses, 3 × 256 octets d'adresses ; remplies par `bbmc` seulement quand le modem demande XTRA |
+| `TimeSet` | `0x5B001001` | 16 | s64 `time_msec` (ms UTC depuis 1970), s32 `timeUnc_msec` (0 chez Sony), u8 `timeBase` (1), u8 `fForce` (0) |
+| `SET_XTRA` | `0x5B001000` | `0x5E4` | u8 n° de bloc, u16 taille totale à +4, u16 taille du bloc à +6 (≤ 1500), données à +8 |
+| `RESET` | `0x5B001003` | 8 | `{0x1FFF, 0x3FF}` (effacement des données d'aide) |
+
+Les noms des champs de `TimeSet` viennent du journal Sony (`argSet.time_msec`, `timeUnc_msec`, `timeBase`, `fForce`). Sony prend l'heure réseau mémorisée (`sceRtcGetCurrentRetainedNetworkTick`), sinon l'heure GPS.
+
+Notifications du modem vers le système (`_agpsCallback`, `shell.self` `0x81198a54`, émises par `bbmc` via `SceGpsForDriver`) :
+
+| Notification | Sens | Réaction de Sony |
+|---|---|---|
+| `0x11000000` | le modem demande les données XTRA | téléchargement puis `SET_XTRA` bloc par bloc |
+| `0x12000000` | le modem demande l'heure | `TimeSet` |
+| `0x60000` + octet bas | accusé de réception d'un bloc XTRA | octet bas 0 → bloc suivant ; sinon fin |
+
+### Outil d'aide (build de diagnostic uniquement)
+
+- `plugin/gps_assist_kernel.c` → `build/gps_assist.skprx` (`plugin/build-assist-kernel.ps1`). Module noyau **chargé à la demande par l'appli, jamais sous `*KERNEL`** : un redémarrage l'efface. Il accroche l'import `ksceSblACMgrIsSystemProgram` de SceGps et ne répond « système » que pour le pid de GPSX00001, transmis au chargement. Il n'utilise ni adresse de module ni NID `ForKernel`. Tous les autres contrôles de SceGps restent actifs.
+- `src/gps_assist.c`, activé par l'option CMake `GPS_ASSIST` (désactivée par défaut) avec `GPS_MINIMAL_DIAGNOSTIC=ON`. Cinq secondes après l'ouverture GPS, la sonde charge le module, lit `0xAB001001` et les infos XTRA, envoie `TimeSet` (incertitude 1 s), puis tente `SET_XTRA` depuis `ux0:data/gps_assist/xtra.bin`. Elle décharge le module en fin de sonde. Les lignes `NMEA` du journal indiquent aussi `chip_date=`.
+- Pour compiler, `gcc` du vitasdk exige `-std=gnu17` : en C23, la macro `TAI_CONTINUE` de taiHEN ne compile pas.
+
+### Essai du 25/09 (18:17–18:28 UTC, console dehors, 3.65)
+
+- `TimeSet` → `0x0`. Date de la puce : 2007/02/09 → **2026/09/25** dès la trame suivante.
+- Infos XTRA vides (`max_size=0`) et `SET_XTRA` direct refusé (`0x8039000B`) : aucune demande du modem n'était alors en cours.
+- **Environ une minute après `TimeSet`, le modem a émis `0x11000000`, pour la première fois dans nos journaux.** Le module COM de SceShell a téléchargé `http://xtra2.gpsOneXTRA.net/xtra.bin` (41 013 octets), l'a enregistré, puis l'a injecté en 28 blocs `SET_XTRA = 0` (`### XTRA Set End ###`, accusé final `0x60032`). Deuxième demande à 18:19:57 : `xtra3`, 28 blocs de nouveau, puis plus aucune demande.
+- Correction d'une hypothèse du 24/09 : le module COM (XTRA et heure) **fonctionne bien sur la console du commerce en 3.65**. Il attendait simplement une demande du modem, que celui-ci n'envoyait pas faute d'heure valide.
+- Malgré l'heure, les données XTRA et une position approchée (47°N 4°E rechargée), **`Satellite Num [0]` sur 503 relevés sur 503 après injection**, `GetPosition` → `0x80101287` et API → `0x80101200` (37 appels), pendant environ 8 minutes.
+
+**Conclusion.** Avec toutes les aides qu'un récepteur Qualcomm peut recevoir, une puce qui capte devrait repérer des satellites en une à deux minutes dehors. Le blocage restant se situe dans la chaîne radio : antenne de la coque, contact à ressort, câble coaxial ou récepteur de la carte ZOE. Ce test servira de référence pour chaque pièce reçue en octobre : même sonde avec aide, même endroit, 15 minutes.
+
+Sauvegardes locales (hors Git) : `build/diagnostic-backup/2026-09-25-assist/` (eboot d'origine SHA-256 `77D946E4…DD3ED`, restauré et relu ; fichiers XTRA téléchargés). Les fichiers `gps_assist.skprx` et `xtra.bin` restent sur la console, sans effet tant que la sonde d'aide n'est pas déployée.

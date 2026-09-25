@@ -20,9 +20,16 @@ set(VITA_VERSION  "01.00")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wshadow -O2")
 
 option(GPS_MINIMAL_DIAGNOSTIC "Build a GPS-only logging diagnostic" OFF)
+# Injection heure/XTRA dans la puce ; exige build/gps_assist.skprx copié dans ux0:app/GPSX00001/
+option(GPS_ASSIST "Add time/XTRA injection to the minimal diagnostic" OFF)
 
 if(GPS_MINIMAL_DIAGNOSTIC)
   add_executable(${PROJECT_NAME} src/minimal_diagnostic.c)
+  if(GPS_ASSIST)
+    target_sources(${PROJECT_NAME} PRIVATE src/gps_assist.c)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE GPS_ASSIST)
+    target_link_libraries(${PROJECT_NAME} taihen_stub SceGps_stub)
+  endif()
   target_link_libraries(${PROJECT_NAME}
     SceCtrl_stub
     SceSysmodule_stub

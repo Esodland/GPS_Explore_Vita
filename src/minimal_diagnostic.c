@@ -12,6 +12,10 @@
 #include <psp2/location.h>
 #include <psp2/rtc.h>
 #include <psp2/sysmodule.h>
+#ifdef GPS_ASSIST
+#include "gps_assist.h"
+#define ASSIST_AT_SECONDS 5
+#endif
 
 #define DIAG_LOG "ux0:/data/gps_minimal_diag.txt"
 #define SONY_DIR "ux0:/liblocation"
@@ -136,13 +140,19 @@ static void poll_sony_log(char last_path[300], SceOff *last_size, int *seen_data
         ++line;
     }
     int found_gga = 0, quality = -1, used = -1, driver = -1;
-    char utc[16] = "";
+    char utc[16] = "", chip_date[11] = "";
     for (; line && *line;) {
         char *next = strchr(line, '\n');
         if (!next) break; /* Ignore an incomplete final line. */
         *next = 0;
         char *sat = strstr(line, "Satellite Num [");
         if (sat) driver = atoi(sat + strlen("Satellite Num ["));
+        /* Date de la puce : 2007/xx/xx tant que le compteur de semaines est faux. */
+        char *date = strstr(line, "datetime[");
+        if (date && strlen(date) >= 19) {
+            memcpy(chip_date, date + strlen("datetime["), 10);
+            chip_date[10] = 0;
+        }
         char *nmea = strchr(line, '$');
         if (nmea && strlen(nmea) > 7 && !strncmp(nmea + 3, "GGA,", 4)) {
             found_gga = 1;
@@ -154,13 +164,17 @@ static void poll_sony_log(char last_path[300], SceOff *last_size, int *seen_data
     }
     if (found_gga || driver >= 0) {
         *seen_data = 1;
-        log_event("NMEA utc=%s quality=%d sats_used=%d driver_sats=%d",
-                  utc[0] ? utc : "?", quality, used, driver);
+        log_event("NMEA utc=%s quality=%d sats_used=%d driver_sats=%d chip_date=%s",
+                  utc[0] ? utc : "?", quality, used, driver, chip_date[0] ? chip_date : "?");
     }
 }
 
 int main(void) {
+#ifdef GPS_ASSIST
+    log_event("BEGIN minimal GPS diagnostic + assist; GPS method=5; max=%d seconds; START=stop", MAX_SECONDS);
+#else
     log_event("BEGIN minimal GPS diagnostic; GPS method=5; max=%d seconds; START=stop", MAX_SECONDS);
+#endif
     SceAppUtilInitParam init = {0};
     SceAppUtilBootParam boot = {0};
     int apputil_module = sceSysmoduleLoadModule(SCE_SYSMODULE_APPUTIL);
@@ -227,6 +241,13 @@ int main(void) {
         SceCtrlData pad = {0};
         sceCtrlPeekBufferPositive(0, &pad, 1);
         if (pad.buttons & SCE_CTRL_START) { log_event("STOP requested by START"); break; }
+#ifdef GPS_ASSIST
+        /* GPS déjà démarré : la machine d'état de SceGps accepte alors les ioctl. */
+        if (elapsed == ASSIST_AT_SECONDS && gps_assist_start(log_event) == 0) {
+            gps_assist_inject_time();
+            gps_assist_inject_xtra();
+        }
+#endif
         if (elapsed && elapsed % 30 == 0) log_event("HEARTBEAT elapsed_s=%d sony_data=%d", elapsed, seen_data);
         sceKernelDelayThread(1000 * 1000);
     }
@@ -238,6 +259,9 @@ int main(void) {
     log_event("THREAD_END ret=0x%08X", (unsigned)result);
     if (result >= 0) sceKernelDeleteThread(thread);
     if (!seen_data) log_event("NMEA unavailable: check /CONFIG/LOCATION/enable_log and Sony log creation");
+#ifdef GPS_ASSIST
+    gps_assist_stop();
+#endif
 
 close_handle:
     result = sceLocationClose(gps_handle);
